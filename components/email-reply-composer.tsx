@@ -4,15 +4,18 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Check, Copy, Loader2, Send, Sparkles, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { generateReply, TONES, type Tone } from "@/lib/reply-generator"
+import { TONES, type Tone } from "@/lib/reply-generator"
 
 const MAX_CHARS = 5000
+const MAX_SUBJECT_CHARS = 200
 
 export function EmailReplyComposer() {
   const router = useRouter()
   const [email, setEmail] = useState("")
+  const [subject, setSubject] = useState("")
   const [tone, setTone] = useState<Tone>("Professional")
   const [reply, setReply] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -21,6 +24,7 @@ export function EmailReplyComposer() {
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [generateError, setGenerateError] = useState<string | null>(null)
 
   const charCount = email.length
   const canGenerate = email.trim().length > 0 && !isGenerating
@@ -33,16 +37,40 @@ export function EmailReplyComposer() {
     setSent(false)
     setSaved(false)
     setSaveError(null)
+    setGenerateError(null)
 
-    // Simulate a short streaming generation for a responsive feel.
-    const full = generateReply(email, tone)
-    await new Promise((r) => setTimeout(r, 500))
-    const words = full.split(" ")
-    for (let i = 0; i < words.length; i++) {
-      await new Promise((r) => setTimeout(r, 18))
-      setReply((prev) => (prev ? prev + " " : "") + words[i])
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          tone,
+          subject: subject.trim() || null,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setGenerateError(data.error ?? `Generation failed (${res.status})`)
+        return
+      }
+
+      const data = (await res.json()) as { text?: string; error?: string }
+      if (data.error) {
+        setGenerateError(data.error)
+        return
+      }
+      if (!data.text) {
+        setGenerateError("Generation returned empty text")
+        return
+      }
+      setReply(data.text)
+    } catch {
+      setGenerateError("Network error while generating")
+    } finally {
+      setIsGenerating(false)
     }
-    setIsGenerating(false)
   }
 
   async function handleCopy() {
@@ -50,7 +78,6 @@ export function EmailReplyComposer() {
     try {
       await navigator.clipboard.writeText(reply)
     } catch {
-      // Clipboard API may be unavailable (e.g. insecure context or sandboxed iframe).
       const textarea = document.createElement("textarea")
       textarea.value = reply
       textarea.style.position = "fixed"
@@ -60,7 +87,7 @@ export function EmailReplyComposer() {
       try {
         document.execCommand("copy")
       } catch {
-        // Ignore — copying is best-effort.
+        // best-effort
       }
       document.body.removeChild(textarea)
     }
@@ -80,7 +107,7 @@ export function EmailReplyComposer() {
           originalEmail: email,
           aiReply: reply,
           tone,
-          subject: null,
+          subject: subject.trim() || null,
           recipientEmail: null,
         }),
       })
@@ -91,7 +118,6 @@ export function EmailReplyComposer() {
       }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
-      // Refresh the history route cache so it shows the new reply when the user visits.
       router.refresh()
     } catch {
       setSaveError("Network error while saving")
@@ -172,7 +198,7 @@ export function EmailReplyComposer() {
           </div>
           <div className="relative min-h-[340px] max-h-[60vh] flex-1 overflow-y-auto px-4 py-4">
             {reply ? (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{reply}</p>
+              <p className="whitespace-pre-wrap pr-1 text-sm leading-relaxed text-foreground">{reply}</p>
             ) : (
               <div className="flex h-full min-h-[300px] items-center justify-center">
                 <p className="text-sm text-muted-foreground">
@@ -189,6 +215,21 @@ export function EmailReplyComposer() {
 
       {/* Controls */}
       <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label htmlFor="subject" className="sm:w-20 text-sm text-muted-foreground">
+            Subject
+          </label>
+          <Input
+            id="subject"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value.slice(0, MAX_SUBJECT_CHARS))}
+            placeholder="Optional — used when saving to history"
+            maxLength={MAX_SUBJECT_CHARS}
+            className="sm:flex-1"
+            aria-label="Subject (optional)"
+          />
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-sm text-muted-foreground">Tone</span>
           {TONES.map((t) => {
@@ -226,6 +267,11 @@ export function EmailReplyComposer() {
           {isGenerating ? "Generating…" : "Generate Reply"}
         </Button>
 
+        {generateError ? (
+          <p className="text-xs text-destructive" role="alert">
+            {generateError}
+          </p>
+        ) : null}
         {saveError ? (
           <p className="text-xs text-destructive" role="alert">
             {saveError}
