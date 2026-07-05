@@ -70,6 +70,7 @@ export function ReplyCard({
             dateTime={record.createdAt}
             className="mr-1 hidden text-xs text-muted-foreground sm:inline"
             title={new Date(record.createdAt).toLocaleString()}
+            suppressHydrationWarning
           >
             {timeAgo(record.createdAt)}
           </time>
@@ -108,6 +109,7 @@ export function ReplyCard({
       <time
         dateTime={record.createdAt}
         className="mt-3 block text-xs text-muted-foreground sm:hidden"
+        suppressHydrationWarning
       >
         {timeAgo(record.createdAt)}
       </time>

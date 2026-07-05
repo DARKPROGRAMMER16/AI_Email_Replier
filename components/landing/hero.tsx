@@ -37,12 +37,12 @@ export function Hero() {
               <ArrowRight className="size-4" />
             </Link>
           </Button>
-          <Button asChild size="lg" variant="outline" className="w-full gap-1.5 sm:w-auto bg-transparent">
-            <Link href="/compose">
+          {/* <Button asChild size="lg" variant="outline" className="w-full gap-1.5 sm:w-auto bg-transparent">
+            <a href="#features">
               <Sparkles className="size-4" />
               Try the demo
-            </Link>
-          </Button>
+            </a>
+          </Button> */}
         </div>
 
         <p className="mt-4 text-xs text-muted-foreground">No credit card required · Free forever plan</p>

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Sparkles } from "lucide-react"
+import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -21,16 +22,26 @@ export function SiteHeader() {
           <Link href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Pricing
           </Link>
-          <Link href="/compose" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+          {/* <Link href="/compose" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Demo
-          </Link>
+          </Link> */}
         </nav>
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button asChild size="sm">
-            <Link href="/compose">Start Free</Link>
-          </Button>
+          <Show when="signed-out">
+            <SignInButton mode="modal">
+              <Button size="sm" variant="ghost">
+                Sign in
+              </Button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <Button size="sm">Start Free</Button>
+            </SignUpButton>
+          </Show>
+          <Show when="signed-in">
+            <UserButton />
+          </Show>
         </div>
       </div>
     </header>

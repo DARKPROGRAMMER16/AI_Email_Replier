@@ -49,16 +49,21 @@ export function SiteFooter() {
             <div key={column.heading}>
               <h4 className="text-sm font-semibold text-foreground">{column.heading}</h4>
               <ul className="mt-4 space-y-3">
-                {column.links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+                {column.links.map((link) => {
+                  const isDead = link.href === "#"
+                  return (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        aria-disabled={isDead || undefined}
+                        tabIndex={isDead ? -1 : undefined}
+                        className="text-sm text-muted-foreground transition-colors hover:text-foreground aria-disabled:pointer-events-none aria-disabled:opacity-60"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           ))}

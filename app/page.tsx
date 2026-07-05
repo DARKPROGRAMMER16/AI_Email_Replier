@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/landing/site-footer"
 
 export default function Page() {
   return (
-    <div className="min-h-svh bg-background">
+    <div id="top" className="min-h-svh bg-background">
       <SiteHeader />
       <main>
         <Hero />

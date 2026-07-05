@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -80,7 +79,7 @@ export function Pricing() {
                 variant={tier.highlighted ? "default" : "outline"}
                 className={cn("mt-8 w-full", !tier.highlighted && "bg-transparent")}
               >
-                <Link href="/compose">{tier.cta}</Link>
+                <a href="#top">{tier.cta}</a>
               </Button>
             </div>
           ))}

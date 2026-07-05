@@ -55,7 +55,7 @@ export function ReplyHistory() {
             aria-label="Search replies"
           />
         </div>
-        <Select value={tone} onValueChange={setTone}>
+        <Select value={tone} onValueChange={(v) => v !== null && setTone(v)}>
           <SelectTrigger className="w-full sm:w-52" aria-label="Filter by tone">
             <SelectValue placeholder="Filter by tone" />
           </SelectTrigger>

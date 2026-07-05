@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { ArrowLeft, Sparkles } from "lucide-react"
+import { Show, UserButton } from "@clerk/nextjs"
 import { EmailReplyComposer } from "@/components/email-reply-composer"
 import { ThemeToggle } from "@/components/theme-toggle"
 
@@ -26,6 +27,9 @@ export default function ComposePage() {
               <span className="hidden sm:inline">Home</span>
             </Link>
             <ThemeToggle />
+            <Show when="signed-in">
+              <UserButton />
+            </Show>
           </div>
         </header>
 

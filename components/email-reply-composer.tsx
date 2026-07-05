@@ -120,7 +120,7 @@ export function EmailReplyComposer() {
               </Button>
             </div>
           </div>
-          <div className="relative min-h-[340px] flex-1 px-4 py-4">
+          <div className="relative min-h-[340px] max-h-[60vh] flex-1 overflow-y-auto px-4 py-4">
             {reply ? (
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{reply}</p>
             ) : (
