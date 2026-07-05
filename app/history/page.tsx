@@ -2,13 +2,16 @@ import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
 import { SiteHeader } from "@/components/landing/site-header"
 import { ReplyHistory } from "@/components/history/reply-history"
+import { listReplies } from "@/lib/reply-history"
 
 export const metadata = {
   title: "Reply history — EmailReplier AI",
   description: "Browse, search, and reuse your past AI-generated email replies.",
 }
 
-export default function HistoryPage() {
+export default async function HistoryPage() {
+  const records = await listReplies()
+
   return (
     <div className="min-h-svh bg-background">
       <SiteHeader />
@@ -26,7 +29,7 @@ export default function HistoryPage() {
             Every reply you generate is saved here. Search, filter by tone, and copy in one click.
           </p>
         </div>
-        <ReplyHistory />
+        <ReplyHistory records={records} />
       </main>
     </div>
   )

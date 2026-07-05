@@ -13,7 +13,9 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    // Skip Next internals, static files, API routes, and Clerk auth routes
-    '/((?!_next|.*\\..*|sign-in|sign-up|api).*)',
+    // Skip Next internals and static files (but NOT api routes — Clerk needs to
+    // run on /api/* so that auth() works inside route handlers).
+    '/((?!_next|.*\\..*|sign-in|sign-up).*)',
+    '/(api|trpc)(.*)',
   ],
 }

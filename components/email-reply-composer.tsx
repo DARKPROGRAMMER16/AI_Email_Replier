@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Copy, Loader2, Send, Sparkles } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Check, Copy, Loader2, Send, Sparkles, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -10,21 +11,28 @@ import { generateReply, TONES, type Tone } from "@/lib/reply-generator"
 const MAX_CHARS = 5000
 
 export function EmailReplyComposer() {
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [tone, setTone] = useState<Tone>("Professional")
   const [reply, setReply] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
   const [sent, setSent] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const charCount = email.length
   const canGenerate = email.trim().length > 0 && !isGenerating
+  const canSave = reply.trim().length > 0 && !isGenerating && !isSaving && !saved
 
   async function handleGenerate() {
     if (!canGenerate) return
     setIsGenerating(true)
     setReply("")
     setSent(false)
+    setSaved(false)
+    setSaveError(null)
 
     // Simulate a short streaming generation for a responsive feel.
     const full = generateReply(email, tone)
@@ -58,6 +66,38 @@ export function EmailReplyComposer() {
     }
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
+  }
+
+  async function handleSave() {
+    if (!canSave) return
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      const res = await fetch("/api/replies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalEmail: email,
+          aiReply: reply,
+          tone,
+          subject: null,
+          recipientEmail: null,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSaveError(data.error ?? "Failed to save reply")
+        return
+      }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+      // Refresh the history route cache so it shows the new reply when the user visits.
+      router.refresh()
+    } catch {
+      setSaveError("Network error while saving")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   function handleSend() {
@@ -107,6 +147,16 @@ export function EmailReplyComposer() {
               >
                 {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
                 <span className="text-xs">{copied ? "Copied" : "Copy"}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSave}
+                disabled={!canSave}
+                className="h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+              >
+                {isSaving ? <Loader2 className="size-4 animate-spin" /> : saved ? <Check className="size-4 text-emerald-500" /> : <Save className="size-4" />}
+                <span className="text-xs">{isSaving ? "Saving…" : saved ? "Saved" : "Save"}</span>
               </Button>
               <Button
                 variant="ghost"
@@ -175,6 +225,12 @@ export function EmailReplyComposer() {
           )}
           {isGenerating ? "Generating…" : "Generate Reply"}
         </Button>
+
+        {saveError ? (
+          <p className="text-xs text-destructive" role="alert">
+            {saveError}
+          </p>
+        ) : null}
       </div>
     </div>
   )

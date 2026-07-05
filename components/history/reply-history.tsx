@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Search, Inbox, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -13,13 +14,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ReplyCard } from "./reply-card"
-import { sampleHistory } from "@/lib/reply-history"
+import type { ReplyRecord } from "@/lib/reply-history"
 import { TONES } from "@/lib/reply-generator"
 
-export function ReplyHistory() {
-  const [records, setRecords] = useState(sampleHistory)
+export function ReplyHistory({ records }: { records: ReplyRecord[] }) {
+  const router = useRouter()
   const [query, setQuery] = useState("")
   const [tone, setTone] = useState<string>("all")
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -27,17 +29,26 @@ export function ReplyHistory() {
       const matchesTone = tone === "all" || r.tone === tone
       const matchesQuery =
         q === "" ||
-        r.subject.toLowerCase().includes(q) ||
-        r.sender.toLowerCase().includes(q) ||
-        r.original.toLowerCase().includes(q) ||
-        r.reply.toLowerCase().includes(q)
+        (r.subject?.toLowerCase().includes(q) ?? false) ||
+        (r.recipientEmail?.toLowerCase().includes(q) ?? false) ||
+        r.originalEmail.toLowerCase().includes(q) ||
+        r.aiReply.toLowerCase().includes(q)
       return matchesTone && matchesQuery
     })
   }, [records, query, tone])
 
-  function handleDelete(id: string) {
-    setRecords((prev) => prev.filter((r) => r.id !== id))
-  }
+  const handleDelete = useCallback(
+    async (id: string) => {
+      setDeletingId(id)
+      try {
+        const res = await fetch(`/api/replies/${id}`, { method: "DELETE" })
+        if (res.ok) router.refresh()
+      } finally {
+        setDeletingId(null)
+      }
+    },
+    [router],
+  )
 
   const hasRecords = records.length > 0
   const hasResults = filtered.length > 0
@@ -50,7 +61,7 @@ export function ReplyHistory() {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search replies, subjects, or senders…"
+            placeholder="Search replies, subjects, or recipients…"
             className="pl-9"
             aria-label="Search replies"
           />
@@ -90,7 +101,12 @@ export function ReplyHistory() {
           </p>
           <div className="space-y-3">
             {filtered.map((record) => (
-              <ReplyCard key={record.id} record={record} onDelete={handleDelete} />
+              <ReplyCard
+                key={record.id}
+                record={record}
+                onDelete={handleDelete}
+                isDeleting={deletingId === record.id}
+              />
             ))}
           </div>
         </>

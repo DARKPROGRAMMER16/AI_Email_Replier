@@ -1,8 +1,9 @@
 import Link from "next/link"
-import { Sparkles } from "lucide-react"
+import { History, Sparkles } from "lucide-react"
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { cn } from "@/lib/utils"
 
 export function SiteHeader() {
   return (
@@ -22,9 +23,14 @@ export function SiteHeader() {
           <Link href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Pricing
           </Link>
-          {/* <Link href="/compose" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Demo
-          </Link> */}
+          <Show when="signed-in">
+            <Link href="/compose" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Compose
+            </Link>
+            <Link href="/history" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              History
+            </Link>
+          </Show>
         </nav>
 
         <div className="flex items-center gap-2">
@@ -40,6 +46,14 @@ export function SiteHeader() {
             </SignUpButton>
           </Show>
           <Show when="signed-in">
+            <Link
+              href="/history"
+              aria-label="Reply history"
+              className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "gap-1.5")}
+            >
+              <History className="size-4" />
+              <span className="hidden sm:inline">History</span>
+            </Link>
             <UserButton />
           </Show>
         </div>

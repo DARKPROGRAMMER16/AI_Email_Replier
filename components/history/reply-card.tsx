@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Check, Copy, Trash2 } from "lucide-react"
+import { Check, Copy, Trash2, Loader2, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ToneBadge } from "./tone-badge"
 import type { ReplyRecord } from "@/lib/reply-history"
@@ -44,14 +44,16 @@ function copyText(text: string) {
 export function ReplyCard({
   record,
   onDelete,
+  isDeleting = false,
 }: {
   record: ReplyRecord
   onDelete: (id: string) => void
+  isDeleting?: boolean
 }) {
   const [copied, setCopied] = useState(false)
 
   function handleCopy() {
-    copyText(record.reply)
+    copyText(record.aiReply)
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
   }
@@ -61,8 +63,15 @@ export function ReplyCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <ToneBadge tone={record.tone} />
-          <span className="text-sm font-medium text-foreground">{record.subject}</span>
-          <span className="text-xs text-muted-foreground">· {record.sender}</span>
+          <span className="text-sm font-medium text-foreground">
+            {record.subject ?? "Untitled reply"}
+          </span>
+          {record.sentAt ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              <Send className="size-3" />
+              Sent
+            </span>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-1">
@@ -88,9 +97,10 @@ export function ReplyCard({
             size="icon"
             className="size-8 text-muted-foreground hover:text-destructive"
             onClick={() => onDelete(record.id)}
+            disabled={isDeleting}
             aria-label="Delete reply"
           >
-            <Trash2 className="size-4" />
+            {isDeleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
           </Button>
         </div>
       </div>
@@ -98,11 +108,11 @@ export function ReplyCard({
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div className="min-w-0">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">Original</p>
-          <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">{record.original}</p>
+          <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">{record.originalEmail}</p>
         </div>
         <div className="min-w-0">
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">AI reply</p>
-          <p className="line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-foreground">{record.reply}</p>
+          <p className="line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-foreground">{record.aiReply}</p>
         </div>
       </div>
 

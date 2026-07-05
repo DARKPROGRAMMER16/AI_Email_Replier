@@ -1,8 +1,10 @@
 import Link from "next/link"
-import { ArrowLeft, Sparkles } from "lucide-react"
+import { ArrowLeft, Sparkles, History } from "lucide-react"
 import { Show, UserButton } from "@clerk/nextjs"
 import { EmailReplyComposer } from "@/components/email-reply-composer"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { buttonVariants } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export default function ComposePage() {
   return (
@@ -26,6 +28,16 @@ export default function ComposePage() {
               <ArrowLeft className="size-4" />
               <span className="hidden sm:inline">Home</span>
             </Link>
+            <Show when="signed-in">
+              <Link
+                href="/history"
+                aria-label="Reply history"
+                className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "gap-1.5")}
+              >
+                <History className="size-4" />
+                <span className="hidden sm:inline">History</span>
+              </Link>
+            </Show>
             <ThemeToggle />
             <Show when="signed-in">
               <UserButton />
