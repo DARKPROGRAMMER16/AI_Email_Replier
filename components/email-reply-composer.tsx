@@ -11,24 +11,35 @@ import { TONES, type Tone } from "@/lib/reply-generator"
 
 const MAX_CHARS = 5000
 const MAX_SUBJECT_CHARS = 200
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function EmailReplyComposer() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [subject, setSubject] = useState("")
+  const [recipientEmail, setRecipientEmail] = useState("")
   const [tone, setTone] = useState<Tone>("Professional")
   const [reply, setReply] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
-  const [sent, setSent] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [savedReplyId, setSavedReplyId] = useState<string | null>(null)
+  const [isSending, setIsSending] = useState(false)
+  const [sent, setSent] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [sendError, setSendError] = useState<string | null>(null)
   const [generateError, setGenerateError] = useState<string | null>(null)
 
   const charCount = email.length
   const canGenerate = email.trim().length > 0 && !isGenerating
   const canSave = reply.trim().length > 0 && !isGenerating && !isSaving && !saved
+  const canSend =
+    reply.trim().length > 0 &&
+    !isGenerating &&
+    !isSaving &&
+    !isSending &&
+    !sent
 
   async function handleGenerate() {
     if (!canGenerate) return
@@ -36,7 +47,9 @@ export function EmailReplyComposer() {
     setReply("")
     setSent(false)
     setSaved(false)
+    setSavedReplyId(null)
     setSaveError(null)
+    setSendError(null)
     setGenerateError(null)
 
     try {
@@ -95,27 +108,40 @@ export function EmailReplyComposer() {
     setTimeout(() => setCopied(false), 1600)
   }
 
+  async function saveReply(): Promise<{ id: string } | { error: string }> {
+    const res = await fetch("/api/replies", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originalEmail: email,
+        aiReply: reply,
+        tone,
+        subject: subject.trim() || null,
+        recipientEmail: recipientEmail.trim() || null,
+      }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      return { error: data.error ?? "Failed to save reply" }
+    }
+    const data = (await res.json()) as { reply?: { id: string }; error?: string }
+    if (!data.reply?.id) {
+      return { error: "Save returned no id" }
+    }
+    return { id: data.reply.id }
+  }
+
   async function handleSave() {
     if (!canSave) return
     setIsSaving(true)
     setSaveError(null)
     try {
-      const res = await fetch("/api/replies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          originalEmail: email,
-          aiReply: reply,
-          tone,
-          subject: subject.trim() || null,
-          recipientEmail: null,
-        }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        setSaveError(data.error ?? "Failed to save reply")
+      const result = await saveReply()
+      if ("error" in result) {
+        setSaveError(result.error)
         return
       }
+      setSavedReplyId(result.id)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
       router.refresh()
@@ -126,10 +152,55 @@ export function EmailReplyComposer() {
     }
   }
 
-  function handleSend() {
-    if (!reply) return
-    setSent(true)
-    setTimeout(() => setSent(false), 1600)
+  async function handleSend() {
+    if (!canSend) return
+    const recipient = recipientEmail.trim()
+    if (!EMAIL_RE.test(recipient)) {
+      setSendError("Enter a valid recipient email address to send")
+      return
+    }
+
+    setIsSending(true)
+    setSendError(null)
+
+    try {
+      // Auto-save first if the user hasn't already.
+      let replyId = savedReplyId
+      if (!replyId) {
+        setIsSaving(true)
+        const saveResult = await saveReply()
+        setIsSaving(false)
+        if ("error" in saveResult) {
+          setSendError(saveResult.error)
+          return
+        }
+        replyId = saveResult.id
+        setSavedReplyId(replyId)
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2000)
+        router.refresh()
+      }
+
+      const res = await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replyId, recipientEmail: recipient }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSendError(data.error ?? `Send failed (${res.status})`)
+        return
+      }
+
+      setSent(true)
+      setTimeout(() => setSent(false), 2500)
+      router.refresh()
+    } catch {
+      setSendError("Network error while sending")
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (
@@ -188,11 +259,11 @@ export function EmailReplyComposer() {
                 variant="ghost"
                 size="sm"
                 onClick={handleSend}
-                disabled={!reply || isGenerating}
+                disabled={!canSend}
                 className="h-8 gap-1.5 px-2.5 text-muted-foreground hover:text-foreground"
               >
-                <Send className="size-4" />
-                <span className="text-xs">{sent ? "Sent" : "Send"}</span>
+                {isSending ? <Loader2 className="size-4 animate-spin" /> : sent ? <Check className="size-4 text-emerald-500" /> : <Send className="size-4" />}
+                <span className="text-xs">{isSending ? "Sending…" : sent ? "Sent" : "Send"}</span>
               </Button>
             </div>
           </div>
@@ -227,6 +298,21 @@ export function EmailReplyComposer() {
             maxLength={MAX_SUBJECT_CHARS}
             className="sm:flex-1"
             aria-label="Subject (optional)"
+          />
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label htmlFor="recipient-email" className="sm:w-20 text-sm text-muted-foreground">
+            Recipient
+          </label>
+          <Input
+            id="recipient-email"
+            type="email"
+            value={recipientEmail}
+            onChange={(e) => setRecipientEmail(e.target.value)}
+            placeholder="Required to send — email address the reply will be sent to"
+            className="sm:flex-1"
+            aria-label="Recipient email (required to send)"
           />
         </div>
 
@@ -275,6 +361,11 @@ export function EmailReplyComposer() {
         {saveError ? (
           <p className="text-xs text-destructive" role="alert">
             {saveError}
+          </p>
+        ) : null}
+        {sendError ? (
+          <p className="text-xs text-destructive" role="alert">
+            {sendError}
           </p>
         ) : null}
       </div>

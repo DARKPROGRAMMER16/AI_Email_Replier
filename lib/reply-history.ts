@@ -92,3 +92,32 @@ export async function deleteReply(id: string): Promise<boolean> {
   }
   return true
 }
+
+export async function markSent(id: string): Promise<boolean> {
+  const supabase = await createSupabaseClient()
+  const { error } = await supabase
+    .from("replies")
+    .update({ sent_at: new Date().toISOString() })
+    .eq("id", id)
+  if (error) {
+    console.error("[markSent] error", error.message)
+    return false
+  }
+  return true
+}
+
+export async function getReply(id: string): Promise<ReplyRecord | null> {
+  const supabase = await createSupabaseClient()
+  const { data, error } = await supabase
+    .from("replies")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle()
+
+  if (error) {
+    console.error("[getReply] error", error.message)
+    return null
+  }
+  if (!data) return null
+  return toReplyRecord(data as ReplyRow)
+}

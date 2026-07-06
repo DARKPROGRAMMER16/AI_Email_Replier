@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Check, Copy, Trash2, Loader2, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ToneBadge } from "./tone-badge"
@@ -50,12 +51,43 @@ export function ReplyCard({
   onDelete: (id: string) => void
   isDeleting?: boolean
 }) {
+  const router = useRouter()
   const [copied, setCopied] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [sendError, setSendError] = useState<string | null>(null)
 
   function handleCopy() {
     copyText(record.aiReply)
     setCopied(true)
     setTimeout(() => setCopied(false), 1600)
+  }
+
+  const canResend = !!record.recipientEmail && !isSending
+
+  async function handleResend() {
+    if (!canResend || !record.recipientEmail) return
+    setIsSending(true)
+    setSendError(null)
+    try {
+      const res = await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          replyId: record.id,
+          recipientEmail: record.recipientEmail,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setSendError(data.error ?? `Send failed (${res.status})`)
+        return
+      }
+      router.refresh()
+    } catch {
+      setSendError("Network error while sending")
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (
@@ -66,6 +98,9 @@ export function ReplyCard({
           <span className="text-sm font-medium text-foreground">
             {record.subject ?? "Untitled reply"}
           </span>
+          {record.recipientEmail ? (
+            <span className="text-xs text-muted-foreground">· {record.recipientEmail}</span>
+          ) : null}
           {record.sentAt ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
               <Send className="size-3" />
@@ -91,6 +126,17 @@ export function ReplyCard({
             aria-label="Copy reply"
           >
             {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground hover:text-foreground"
+            onClick={handleResend}
+            disabled={!canResend}
+            aria-label={record.recipientEmail ? `Resend to ${record.recipientEmail}` : "Recipient email missing"}
+            title={record.recipientEmail ? `Resend to ${record.recipientEmail}` : "Recipient email missing"}
+          >
+            {isSending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
           </Button>
           <Button
             variant="ghost"
@@ -123,6 +169,12 @@ export function ReplyCard({
       >
         {timeAgo(record.createdAt)}
       </time>
+
+      {sendError ? (
+        <p className="mt-3 text-xs text-destructive" role="alert">
+          {sendError}
+        </p>
+      ) : null}
     </article>
   )
 }
