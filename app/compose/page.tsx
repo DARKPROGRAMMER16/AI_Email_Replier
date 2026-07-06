@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { ArrowLeft, Sparkles, History } from "lucide-react"
+import { Suspense } from "react"
+import { ArrowLeft, Sparkles, History, Loader2 } from "lucide-react"
 import { Show, UserButton } from "@clerk/nextjs"
 import { EmailReplyComposer } from "@/components/email-reply-composer"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -54,7 +55,15 @@ export default function ComposePage() {
           </p>
         </div>
 
-        <EmailReplyComposer />
+        <Suspense
+          fallback={
+            <div className="flex min-h-[400px] items-center justify-center text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
+            </div>
+          }
+        >
+          <EmailReplyComposer />
+        </Suspense>
       </div>
     </main>
   )

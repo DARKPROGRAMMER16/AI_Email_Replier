@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Check, Copy, Trash2, Loader2, Send } from "lucide-react"
+import { Check, Copy, Trash2, Loader2, Send, RotateCcw } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { ToneBadge } from "./tone-badge"
 import type { ReplyRecord } from "@/lib/reply-history"
@@ -54,7 +55,6 @@ export function ReplyCard({
   const router = useRouter()
   const [copied, setCopied] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const [sendError, setSendError] = useState<string | null>(null)
 
   function handleCopy() {
     copyText(record.aiReply)
@@ -67,7 +67,6 @@ export function ReplyCard({
   async function handleResend() {
     if (!canResend || !record.recipientEmail) return
     setIsSending(true)
-    setSendError(null)
     try {
       const res = await fetch("/api/send", {
         method: "POST",
@@ -79,15 +78,25 @@ export function ReplyCard({
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setSendError(data.error ?? `Send failed (${res.status})`)
+        toast.error(data.error ?? `Send failed (${res.status})`)
         return
       }
+      toast.success(`Email sent to ${record.recipientEmail}`)
       router.refresh()
     } catch {
-      setSendError("Network error while sending")
+      toast.error("Network error while sending")
     } finally {
       setIsSending(false)
     }
+  }
+
+  function handleReuseClick() {
+    const payload = JSON.stringify({
+      originalEmail: record.originalEmail,
+      tone: record.tone,
+      subject: record.subject,
+    })
+    router.push(`/compose?reuse=${encodeURIComponent(payload)}`)
   }
 
   return (
@@ -118,6 +127,16 @@ export function ReplyCard({
           >
             {timeAgo(record.createdAt)}
           </time>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground hover:text-foreground"
+            onClick={handleReuseClick}
+            aria-label="Reuse this email as a starting point"
+            title="Reuse this email as a starting point"
+          >
+            <RotateCcw className="size-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -169,12 +188,6 @@ export function ReplyCard({
       >
         {timeAgo(record.createdAt)}
       </time>
-
-      {sendError ? (
-        <p className="mt-3 text-xs text-destructive" role="alert">
-          {sendError}
-        </p>
-      ) : null}
     </article>
   )
 }

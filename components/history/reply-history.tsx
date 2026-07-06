@@ -4,6 +4,7 @@ import { useMemo, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Search, Inbox, Sparkles } from "lucide-react"
+import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,7 +43,15 @@ export function ReplyHistory({ records }: { records: ReplyRecord[] }) {
       setDeletingId(id)
       try {
         const res = await fetch(`/api/replies/${id}`, { method: "DELETE" })
-        if (res.ok) router.refresh()
+        if (res.ok) {
+          toast.success("Reply deleted")
+          router.refresh()
+        } else {
+          const data = await res.json().catch(() => ({}))
+          toast.error(data.error ?? `Delete failed (${res.status})`)
+        }
+      } catch {
+        toast.error("Network error while deleting")
       } finally {
         setDeletingId(null)
       }

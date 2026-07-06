@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Check, Copy, Loader2, Send, Sparkles, Save } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -15,6 +16,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function EmailReplyComposer() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [subject, setSubject] = useState("")
   const [recipientEmail, setRecipientEmail] = useState("")
@@ -27,9 +29,28 @@ export function EmailReplyComposer() {
   const [savedReplyId, setSavedReplyId] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const [sent, setSent] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [sendError, setSendError] = useState<string | null>(null)
-  const [generateError, setGenerateError] = useState<string | null>(null)
+  const [prefilledFromHistory, setPrefilledFromHistory] = useState(false)
+  const toneGroupRef = useRef<HTMLDivElement>(null)
+
+  // Prefill from history reuse (query params: ?email=...&tone=...&subject=...)
+  useEffect(() => {
+    const reuseEmail = searchParams.get("reuse")
+    if (!reuseEmail) return
+
+    try {
+      const decoded = JSON.parse(decodeURIComponent(reuseEmail)) as {
+        originalEmail?: string
+        tone?: Tone
+        subject?: string
+      }
+      if (decoded.originalEmail) setEmail(decoded.originalEmail.slice(0, MAX_CHARS))
+      if (decoded.tone && TONES.includes(decoded.tone)) setTone(decoded.tone)
+      if (decoded.subject) setSubject((decoded.subject ?? "").slice(0, MAX_SUBJECT_CHARS))
+      setPrefilledFromHistory(true)
+    } catch {
+      // Ignore malformed reuse payloads — silent fallback to empty composer.
+    }
+  }, [searchParams])
 
   const charCount = email.length
   const canGenerate = email.trim().length > 0 && !isGenerating
@@ -41,6 +62,22 @@ export function EmailReplyComposer() {
     !isSending &&
     !sent
 
+  function handleToneKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault()
+      const next = (index + 1) % TONES.length
+      const buttons = toneGroupRef.current?.querySelectorAll<HTMLButtonElement>("[role='radio']")
+      buttons?.[next]?.focus()
+      setTone(TONES[next])
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault()
+      const prev = (index - 1 + TONES.length) % TONES.length
+      const buttons = toneGroupRef.current?.querySelectorAll<HTMLButtonElement>("[role='radio']")
+      buttons?.[prev]?.focus()
+      setTone(TONES[prev])
+    }
+  }
+
   async function handleGenerate() {
     if (!canGenerate) return
     setIsGenerating(true)
@@ -48,9 +85,6 @@ export function EmailReplyComposer() {
     setSent(false)
     setSaved(false)
     setSavedReplyId(null)
-    setSaveError(null)
-    setSendError(null)
-    setGenerateError(null)
 
     try {
       const res = await fetch("/api/generate", {
@@ -65,22 +99,22 @@ export function EmailReplyComposer() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setGenerateError(data.error ?? `Generation failed (${res.status})`)
+        toast.error(data.error ?? `Generation failed (${res.status})`)
         return
       }
 
       const data = (await res.json()) as { text?: string; error?: string }
       if (data.error) {
-        setGenerateError(data.error)
+        toast.error(data.error)
         return
       }
       if (!data.text) {
-        setGenerateError("Generation returned empty text")
+        toast.error("Generation returned empty text")
         return
       }
       setReply(data.text)
     } catch {
-      setGenerateError("Network error while generating")
+      toast.error("Network error while generating")
     } finally {
       setIsGenerating(false)
     }
@@ -134,19 +168,19 @@ export function EmailReplyComposer() {
   async function handleSave() {
     if (!canSave) return
     setIsSaving(true)
-    setSaveError(null)
     try {
       const result = await saveReply()
       if ("error" in result) {
-        setSaveError(result.error)
+        toast.error(result.error)
         return
       }
       setSavedReplyId(result.id)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
+      toast.success("Reply saved to history")
       router.refresh()
     } catch {
-      setSaveError("Network error while saving")
+      toast.error("Network error while saving")
     } finally {
       setIsSaving(false)
     }
@@ -156,28 +190,27 @@ export function EmailReplyComposer() {
     if (!canSend) return
     const recipient = recipientEmail.trim()
     if (!EMAIL_RE.test(recipient)) {
-      setSendError("Enter a valid recipient email address to send")
+      toast.error("Enter a valid recipient email address to send")
       return
     }
 
     setIsSending(true)
-    setSendError(null)
 
     try {
-      // Auto-save first if the user hasn't already.
       let replyId = savedReplyId
       if (!replyId) {
         setIsSaving(true)
         const saveResult = await saveReply()
         setIsSaving(false)
         if ("error" in saveResult) {
-          setSendError(saveResult.error)
+          toast.error(saveResult.error)
           return
         }
         replyId = saveResult.id
         setSavedReplyId(replyId)
         setSaved(true)
         setTimeout(() => setSaved(false), 2000)
+        toast.success("Reply saved to history")
         router.refresh()
       }
 
@@ -189,15 +222,16 @@ export function EmailReplyComposer() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setSendError(data.error ?? `Send failed (${res.status})`)
+        toast.error(data.error ?? `Send failed (${res.status})`)
         return
       }
 
       setSent(true)
       setTimeout(() => setSent(false), 2500)
+      toast.success(`Email sent to ${recipient}`)
       router.refresh()
     } catch {
-      setSendError("Network error while sending")
+      toast.error("Network error while sending")
     } finally {
       setIsSending(false)
     }
@@ -205,6 +239,24 @@ export function EmailReplyComposer() {
 
   return (
     <div className="flex flex-col gap-6">
+      {prefilledFromHistory ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm">
+          <span className="text-foreground">
+            Prefilled from history — tweak the inputs and generate a fresh reply.
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setPrefilledFromHistory(false)
+              router.replace("/compose")
+            }}
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Input column */}
         <div className="flex flex-col rounded-xl border border-border bg-card shadow-sm">
@@ -316,16 +368,24 @@ export function EmailReplyComposer() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          ref={toneGroupRef}
+          role="radiogroup"
+          aria-label="Reply tone"
+          className="flex flex-wrap items-center gap-2"
+        >
           <span className="mr-1 text-sm text-muted-foreground">Tone</span>
-          {TONES.map((t) => {
+          {TONES.map((t, index) => {
             const active = t === tone
             return (
               <button
                 key={t}
                 type="button"
+                role="radio"
+                aria-checked={active}
+                tabIndex={active ? 0 : -1}
                 onClick={() => setTone(t)}
-                aria-pressed={active}
+                onKeyDown={(e) => handleToneKeyDown(e, index)}
                 className={cn(
                   "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
                   active
@@ -352,22 +412,6 @@ export function EmailReplyComposer() {
           )}
           {isGenerating ? "Generating…" : "Generate Reply"}
         </Button>
-
-        {generateError ? (
-          <p className="text-xs text-destructive" role="alert">
-            {generateError}
-          </p>
-        ) : null}
-        {saveError ? (
-          <p className="text-xs text-destructive" role="alert">
-            {saveError}
-          </p>
-        ) : null}
-        {sendError ? (
-          <p className="text-xs text-destructive" role="alert">
-            {sendError}
-          </p>
-        ) : null}
       </div>
     </div>
   )
