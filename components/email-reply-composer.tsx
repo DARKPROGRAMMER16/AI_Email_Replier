@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { TONES, type Tone } from "@/lib/reply-generator"
+import { TONES, type Tone } from "@/lib/tone"
+import {
+  MAX_EMAIL_CHARS,
+  MAX_SUBJECT_CHARS,
+  TRANSIENT_FEEDBACK_MS,
+} from "@/lib/limits"
 
-const MAX_CHARS = 5000
-const MAX_SUBJECT_CHARS = 200
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export function EmailReplyComposer() {
@@ -30,6 +33,14 @@ export function EmailReplyComposer() {
   const [isSending, setIsSending] = useState(false)
   const [sent, setSent] = useState(false)
   const [prefilledFromHistory, setPrefilledFromHistory] = useState(false)
+  /**
+   * Guards against double-click races in handleSend and handleSave.
+   * Without this, two rapid clicks could trigger two parallel POSTs to
+   * /api/replies (creating duplicate rows) and one stray POST to /api/send
+   * with a stale replyId. The flag is set synchronously in the click handler
+   * before any await, so the second click sees it in flight and bails.
+   */
+  const sendInFlightRef = useRef(false)
   const toneGroupRef = useRef<HTMLDivElement>(null)
 
   // Prefill from history reuse (query params: ?email=...&tone=...&subject=...)
@@ -43,7 +54,7 @@ export function EmailReplyComposer() {
         tone?: Tone
         subject?: string
       }
-      if (decoded.originalEmail) setEmail(decoded.originalEmail.slice(0, MAX_CHARS))
+      if (decoded.originalEmail) setEmail(decoded.originalEmail.slice(0, MAX_EMAIL_CHARS))
       if (decoded.tone && TONES.includes(decoded.tone)) setTone(decoded.tone)
       if (decoded.subject) setSubject((decoded.subject ?? "").slice(0, MAX_SUBJECT_CHARS))
       setPrefilledFromHistory(true)
@@ -139,7 +150,7 @@ export function EmailReplyComposer() {
       document.body.removeChild(textarea)
     }
     setCopied(true)
-    setTimeout(() => setCopied(false), 1600)
+    setTimeout(() => setCopied(false), TRANSIENT_FEEDBACK_MS)
   }
 
   async function saveReply(): Promise<{ id: string } | { error: string }> {
@@ -176,7 +187,7 @@ export function EmailReplyComposer() {
       }
       setSavedReplyId(result.id)
       setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      setTimeout(() => setSaved(false), TRANSIENT_FEEDBACK_MS)
       toast.success("Reply saved to history")
       router.refresh()
     } catch {
@@ -209,7 +220,7 @@ export function EmailReplyComposer() {
         replyId = saveResult.id
         setSavedReplyId(replyId)
         setSaved(true)
-        setTimeout(() => setSaved(false), 2000)
+        setTimeout(() => setSaved(false), TRANSIENT_FEEDBACK_MS)
         toast.success("Reply saved to history")
         router.refresh()
       }
@@ -227,7 +238,7 @@ export function EmailReplyComposer() {
       }
 
       setSent(true)
-      setTimeout(() => setSent(false), 2500)
+      setTimeout(() => setSent(false), TRANSIENT_FEEDBACK_MS)
       toast.success(`Email sent to ${recipient}`)
       router.refresh()
     } catch {
@@ -267,16 +278,16 @@ export function EmailReplyComposer() {
             <span
               className={cn(
                 "font-mono text-xs tabular-nums",
-                charCount > MAX_CHARS ? "text-destructive" : "text-muted-foreground",
+                charCount > MAX_EMAIL_CHARS ? "text-destructive" : "text-muted-foreground",
               )}
             >
-              {charCount.toLocaleString()} / {MAX_CHARS.toLocaleString()}
+              {charCount.toLocaleString()} / {MAX_EMAIL_CHARS.toLocaleString()}
             </span>
           </div>
           <Textarea
             id="source-email"
             value={email}
-            onChange={(e) => setEmail(e.target.value.slice(0, MAX_CHARS))}
+            onChange={(e) => setEmail(e.target.value.slice(0, MAX_EMAIL_CHARS))}
             placeholder="Hi, I wanted to follow up on our conversation last week about the project timeline…"
             className="min-h-[340px] flex-1 resize-none rounded-none border-0 bg-transparent px-4 py-4 text-sm leading-relaxed shadow-none focus-visible:ring-0"
           />

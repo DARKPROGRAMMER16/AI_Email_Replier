@@ -1,4 +1,4 @@
-import type { Tone } from "@/lib/reply-generator"
+import type { Tone } from "@/lib/tone"
 
 export type GenerateInput = {
   email: string

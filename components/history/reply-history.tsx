@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select"
 import { ReplyCard } from "./reply-card"
 import type { ReplyRecord } from "@/lib/reply-history"
-import { TONES } from "@/lib/reply-generator"
+import { TONES } from "@/lib/tone"
 
 export function ReplyHistory({ records }: { records: ReplyRecord[] }) {
   const router = useRouter()

@@ -1,5 +1,5 @@
 import { createSupabaseClient } from "@/lib/supabase/server"
-import type { Tone } from "@/lib/reply-generator"
+import type { Tone } from "@/lib/tone"
 
 export type ReplyRecord = {
   id: string

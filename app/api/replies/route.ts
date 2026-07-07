@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 import { insertReply, type NewReply } from "@/lib/reply-history"
-import type { Tone } from "@/lib/reply-generator"
+import type { Tone } from "@/lib/tone"
 
 export async function POST(request: Request) {
   let body: Partial<NewReply> & { tone?: string }

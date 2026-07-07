@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import type { Tone } from "@/lib/reply-generator"
+import type { Tone } from "@/lib/tone"
 
 const toneStyles: Record<Tone, string> = {
   Professional: "border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-400",

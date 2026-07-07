@@ -3,10 +3,14 @@ import { auth } from "@clerk/nextjs/server"
 import { generateText } from "ai"
 import { createGoogle } from "@ai-sdk/google"
 import { buildSystemPrompt, buildUserPrompt } from "@/lib/prompts"
-import type { Tone } from "@/lib/reply-generator"
+import type { Tone } from "@/lib/tone"
+import {
+  MAX_EMAIL_CHARS,
+  MAX_OUTPUT_TOKENS,
+  GENERATION_TEMPERATURE,
+} from "@/lib/limits"
 
 const VALID_TONES: Tone[] = ["Professional", "Friendly", "Brief", "Apologetic", "Enthusiastic"]
-const MAX_EMAIL_CHARS = 5000
 
 export async function POST(request: Request) {
   const { userId } = await auth()
@@ -43,8 +47,8 @@ export async function POST(request: Request) {
       model,
       system: buildSystemPrompt(tone),
       prompt: buildUserPrompt({ email, tone, subject }),
-      temperature: 0.7,
-      maxOutputTokens: 500,
+temperature: GENERATION_TEMPERATURE,
+    maxOutputTokens: MAX_OUTPUT_TOKENS,
     })
 
     return NextResponse.json({ text: result.text })
